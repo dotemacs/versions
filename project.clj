@@ -17,7 +17,7 @@
                  [slingshot/slingshot "0.12.2"]
                  [environ "1.1.0"]
                  [ring.middleware.conditional "0.2.0"]
-                 [matchbox "0.0.8-SNAPSHOT"]
+                 [matchbox "0.0.9"]
                  [clj-http "3.7.0"]
                  [io.sentry/sentry-clj "0.5.1"]]
   :main jarkeeper.core

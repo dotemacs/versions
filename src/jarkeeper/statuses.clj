@@ -3,9 +3,12 @@
             [clojure.string :as str]
             [clj-http.client :as client]
             [clojure.tools.logging :as log]
-            [ancient-clj.core :as anc])
+            [ancient-clj.core :as anc]
+            [jarkeeper.firebase :as fb :refer [fire-root deref-sync]]
+            [matchbox.core :as m])
 
-  (:import (java.io PushbackReader)))
+  (:import (java.io PushbackReader)
+           (java.time Instant Duration)))
 
 (defn- starting-num? [string]
   (some-> string
@@ -60,8 +63,22 @@
     (catch Exception _
       nil)))
 
+(defn newer-than-1-hour? [instant]
+  (.isAfter instant (.minus (Instant/now) (Duration/ofHours 1))))
+
+(defn outdated? [dependency]
+  (let [{:keys [group id version-string]} (anc/read-artifact dependency)
+        ref (m/get-in fire-root [:outdated (fb/safe group) (fb/safe id) (fb/safe version-string)])
+        {:keys [outdated checked-at] :as outdated-record} (deref-sync ref)]
+    (if (and (some? outdated-record) (newer-than-1-hour? (Instant/ofEpochSecond (:epochSecond checked-at))))
+      outdated
+      (let [outdated (anc/artifact-outdated? dependency {:snapshots? false :qualified? false})]
+        (m/reset! ref {:outdated   outdated
+                       :checked-at (Instant/now)})
+        outdated))))
+
 (defn check-deps [deps]
-  (map #(conj % (anc/artifact-outdated? % {:snapshots? false :qualified? false})) deps))
+  (map #(conj % (outdated? %)) deps))
 
 (defn calculate-stats [deps]
   (let [up-to-date-deps (remove nil? (map (fn [dep] (if (nil? (last dep)) dep nil)) deps))

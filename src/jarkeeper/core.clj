@@ -16,6 +16,7 @@
             [jarkeeper.views.index :as index-view]
             [jarkeeper.views.project :as project-view]
             [jarkeeper.views.json :as project-json]
+            [jarkeeper.firebase :refer [fire-root]]
             [environ.core :refer [env]]
             [sentry-clj.ring :as sentry-ring]
             [matchbox.core :as m]
@@ -25,11 +26,6 @@
   (:import (java.io PushbackReader)
            [java.text SimpleDateFormat]
            [java.util Locale TimeZone]))
-
-
-(def fire-root (m/connect "https://deps-versions.firebaseio.com"))
-(if (env :firebase-token)
-  (m/auth-custom fire-root (env :firebase-token) prn-str))
 
 
 (def last-modified-formatter "EEE, dd MMM yyyy HH:mm:ss zzz")
@@ -144,7 +140,9 @@
       (cond/if production? ssl/wrap-ssl-redirect)
       (cond/if production? ssl/wrap-hsts)
       (ssl/wrap-forwarded-scheme)
-      (sentry-ring/wrap-report-exceptions nil {})))
+      (sentry-ring/wrap-report-exceptions nil
+                                          {:postprocess-fn (fn [req event]
+                                                             (println (:throwable event) "Unhandled exception" event))})))
 
 (defn -main [& args]
   (let [ip "0.0.0.0"
